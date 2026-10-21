@@ -52,14 +52,12 @@ stmt = decl
      | block ;
 
 decl = fun_decl
-     | var_decl
-     | shape_decl ;
+     | var_decl ;
 
-fun_decl = "fun" [ identifier ] "(" [ parameter_list ] ")" block "end" ;
+fun_decl = "fun" [ identifier ] "(" [ parameter_list ] ")" do block "end" ;
 parameter_list = identifier { "," identifier } ;
 
 var_decl = "var" identifier "=" expr ;
-shape_decl = "shape" identifier { var_decl } "end" ;
 
 expr_stmt = expr ;
 return_stmt = "return" [ expr ] ;

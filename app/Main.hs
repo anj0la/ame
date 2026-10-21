@@ -1,6 +1,6 @@
 module Main (main) where
 
-import Position
+import Position ( Position(..) ) -- importing just Position (Haskell infers the fields)
 
 main :: IO ()
 main = do
