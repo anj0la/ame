@@ -1,4 +1,9 @@
 module Main (main) where
 
+import Position
+
 main :: IO ()
-main = putStrLn "Hello, Haskell!"
+main = do
+    let pos = Position 1 1
+    print pos 
+    putStrLn "Hello, Haskell!"
