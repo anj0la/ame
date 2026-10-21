@@ -1,0 +1,103 @@
+program = { stmt } EOF ;
+
+expr = literal_expr
+       | operator_expr
+       | grouped_expr
+       | call_expr ;
+
+literal_expr = literal ;
+operator_expr = assignment_expr
+              | comparsion_expr
+              | arithmetic_expr
+              | bitwise_expr
+              | logical_expr
+              | negation_expr ;
+
+assignment_expr = expr "=" expr ;
+
+comparsion_expr = expr "==" expr
+                | expr "!=" expr
+                | expr ">" expr
+                | expr "<" expr
+                | expr ">=" expr
+                | expr "<=" expr ;
+
+arithmetic_expr = expr "+" expr
+                | expr "-" expr
+                | expr "*" expression
+                | expr "/" expr
+                | expr "%" expr ;
+
+bitwise_expr = expr "&" expr
+             | expr "|" expr
+             | expr "^" expr
+             | expr ">>" expr
+             | expr "<<" expr ;
+
+logical_expr = expr "and" expr
+             | expr "or" expr ;
+
+negation_expr = "-" expr
+             | "not" expr ;
+
+grouped_expr = "(" expr ")" ;
+call_expr = "(" [ call_params ] ")" ;
+call_params = expr { ","  expr } ;
+
+stmt = decl
+     | expr_stmt
+     | return_stmt
+     | if_stmt
+     | while_stmt
+     | block ;
+
+decl = fun_decl
+     | var_decl
+     | shape_decl ;
+
+fun_decl = "fun" [ identifier ] "(" [ parameter_list ] ")" block "end" ;
+parameter_list = identifier { "," identifier } ;
+
+var_decl = "var" identifier "=" expr ;
+shape_decl = "shape" identifier { var_decl } "end" ;
+
+expr_stmt = expr ;
+return_stmt = "return" [ expr ] ;
+if_statement = "if" expr "then" block [ "else" block ] "end" ;
+while_stmt = "while" expr "do" block "end" ;
+block = { stmt } ;
+
+literal = integer_literal
+          | float_literal
+          | character_literal
+          | string_literal
+          | boolean_literal ;
+
+integer_literal = decimal_integer
+                | hexadecimal_integer
+                | binary_integer
+                | octal_integer ;
+
+decimal_integer = digit { digit } ;
+hexadecimal_integer = "0" ( "x" | "X")  hex_digit { hex_digit } ;
+binary_integer = "0" ( "b" | "B" ) binary_digit { binary_digit } ;
+octal_integer = "0" ( "o" | "O" ) octal_digit { octal_digit } ;
+
+float_literal = decimal_integer "." decimal_integer [ scientific_notation ]
+              | decimal_integer scientific_notation ;
+scientific_notation = ( "e" | "E" ) [ "+" | "-" ] decimal_integer ;
+
+character_literal = "'" character  "'" ;
+string_literal = """ { character } """;
+boolean_literal = "true" | "false" ;
+
+character = printable | escape_sequence ;
+printable = alpha | digit | symbol | space ;
+alpha = "a" ... "z" | "A" ... "Z" ;
+digit = "0" ... "9";
+symbol = "!" ... "/" | ":" ... "@" | "[" ... "`" | "{" ... "~" ;
+underscore = "_" ;
+escape_sequence = "\\" ( "n" | "t" | "r" | "\"" | "'" | "\\" ) ;
+space = " " ;
+
+identifier = (alpha | "_" ) { (alpha | digit | "_" ) } ;
