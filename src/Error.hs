@@ -7,9 +7,6 @@ data Error = Error
     , message :: String
     } deriving (Show)
 
-reporter :: [Error]
-reporter = []
-
 addError :: Position -> String -> [Error] -> [Error]
 addError pos msg rep =
     let err = Error pos msg
