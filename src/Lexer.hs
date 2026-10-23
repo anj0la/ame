@@ -8,13 +8,13 @@ data Lexer = Lexer
     { source :: String 
     , start :: Int
     , curr :: Int 
-    , lex_pos :: Position
+    , lexPos :: Position
     , tokens :: [Token]
     , rep :: [Error]
     }
 
 init :: String -> Lexer 
-init src = Lexer { source = src, start = 0, curr = 0, lex_pos = Position 1 1, tokens = [], rep = [] }
+init src = Lexer { source = src, start = 0, curr = 0, lexPos = Position 1 1, tokens = [], rep = [] }
 
 isDigit :: Char -> Bool 
 isDigit c = c >= '0' && c <= '9'
@@ -46,10 +46,47 @@ isSymbol c = (c >= '!' && c <= '/') || (c >= ':' && c <= '@') || (c >= '[' && c 
 isSpace :: Char -> Bool 
 isSpace c = c == ' '
 
-isAtEnd :: Lexer -> Bool
-isAtEnd lex = (curr lex) >= length (source lex)
+peek :: String -> Maybe Char 
+peek [] = Nothing 
+peek (x : _) = Just x
+
+peekNext :: String -> Maybe Char 
+peekNext [] = Nothing 
+peekNext (_ : x : _) = Just x 
+
+updatePos :: Position -> Int -> Int -> Position 
+updatePos oldPos newLine newCol = 
+    oldPos 
+        { line = newLine
+        , col = newCol
+        }
+
+advance :: Lexer -> (Char, Lexer)
+advance lexer = 
+    let char = head (source lexer) 
+        oldPos = lexPos lexer
+    in case char of
+        '\n' -> (char, lexer 
+                        { curr = curr lexer + 1
+                        , lexPos = updatePos oldPos (line oldPos + 1) (1)
+                        }) 
+        '\t' -> (char, lexer 
+                        { curr = curr lexer + 1
+                        , lexPos = updatePos oldPos (line oldPos) (col oldPos + 4)
+                        })
+        '\r' -> (char, lexer 
+                        { curr = curr lexer + 1
+                        , lexPos = updatePos oldPos (line oldPos) (1)
+                        }) 
+        _ -> (char, lexer 
+                        { curr = curr lexer + 1
+                        , lexPos = updatePos oldPos (line oldPos) (col oldPos + 1)
+                        })
 
 bump :: Lexer -> Lexer -- only returns updated lexer state
-bump lex = lex { curr = curr lex + 1 }
-
-
+bump lexer = 
+    let oldPos = lexPos lexer 
+    in lexer 
+        { curr = curr lexer + 1
+        , lexPos = updatePos oldPos (line oldPos) (col oldPos + 1) 
+        }
