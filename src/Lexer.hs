@@ -4,17 +4,19 @@ import Error
 import Position
 import Token
 
+-- LEXER TYPE 
+
 data Lexer = Lexer 
     { source :: String 
-    , start :: Int
-    , curr :: Int 
     , lexPos :: Position
     , tokens :: [Token]
     , rep :: [Error]
     }
 
 init :: String -> Lexer 
-init src = Lexer { source = src, start = 0, curr = 0, lexPos = Position 1 1, tokens = [], rep = [] }
+init src = Lexer { source = src, lexPos = Position 1 1, tokens = [], rep = [] }
+
+-- HELPER FUNCTIONS
 
 isDigit :: Char -> Bool 
 isDigit c = c >= '0' && c <= '9'
@@ -63,23 +65,23 @@ updatePos oldPos newLine newCol =
 
 advance :: Lexer -> (Char, Lexer)
 advance lexer = 
-    let char = head (source lexer) 
+    let char = head (source lexer)
         oldPos = lexPos lexer
     in case char of
         '\n' -> (char, lexer 
-                        { curr = curr lexer + 1
+                        { source = tail (source lexer) 
                         , lexPos = updatePos oldPos (line oldPos + 1) (1)
                         }) 
         '\t' -> (char, lexer 
-                        { curr = curr lexer + 1
+                        { source = tail (source lexer)
                         , lexPos = updatePos oldPos (line oldPos) (col oldPos + 4)
                         })
         '\r' -> (char, lexer 
-                        { curr = curr lexer + 1
+                        { source = tail (source lexer)
                         , lexPos = updatePos oldPos (line oldPos) (1)
                         }) 
         _ -> (char, lexer 
-                        { curr = curr lexer + 1
+                        { source = tail (source lexer)
                         , lexPos = updatePos oldPos (line oldPos) (col oldPos + 1)
                         })
 
@@ -87,6 +89,17 @@ bump :: Lexer -> Lexer -- only returns updated lexer state
 bump lexer = 
     let oldPos = lexPos lexer 
     in lexer 
-        { curr = curr lexer + 1
+        { source = tail (source lexer)
         , lexPos = updatePos oldPos (line oldPos) (col oldPos + 1) 
         }
+
+-- READ FUNCTIONS 
+
+readLineComment :: Lexer -> Lexer 
+readLineComment lexer =
+    case peek (source lexer) of 
+        Just '\n'   -> lexer 
+        Just _      -> 
+            let (_, lexer') = advance lexer 
+            in readLineComment lexer'
+        Nothing     -> lexer -- reached the end of the lexer
