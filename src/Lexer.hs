@@ -8,13 +8,15 @@ import Token
 
 data Lexer = Lexer 
     { source :: String 
+    , start :: Int 
+    , curr :: Int
     , lexPos :: Position
     , tokens :: [Token]
     , rep :: [Error]
     }
 
 init :: String -> Lexer 
-init src = Lexer { source = src, lexPos = Position 1 1, tokens = [], rep = [] }
+init src = Lexer { source = src, start = 0, curr = 0, lexPos = Position 1 1, tokens = [], rep = [] }
 
 -- HELPER FUNCTIONS
 
@@ -70,18 +72,22 @@ advance lexer =
     in case char of
         '\n' -> (char, lexer 
                         { source = tail (source lexer) 
+                        , curr = curr lexer + 1 -- for now, we'll keep this here, but we'll probs not need it
                         , lexPos = updatePos oldPos (line oldPos + 1) (1)
                         }) 
         '\t' -> (char, lexer 
                         { source = tail (source lexer)
+                        , curr = curr lexer + 1
                         , lexPos = updatePos oldPos (line oldPos) (col oldPos + 4)
                         })
         '\r' -> (char, lexer 
                         { source = tail (source lexer)
+                        , curr = curr lexer + 1
                         , lexPos = updatePos oldPos (line oldPos) (1)
                         }) 
         _ -> (char, lexer 
                         { source = tail (source lexer)
+                        , curr = curr lexer + 1
                         , lexPos = updatePos oldPos (line oldPos) (col oldPos + 1)
                         })
 
@@ -93,6 +99,43 @@ bump lexer =
         , lexPos = updatePos oldPos (line oldPos) (col oldPos + 1) 
         }
 
+-- ADD TOKEN FUNCTIONS
+
+addEofToken :: Lexer -> Lexer 
+addEofToken lexer =
+    let token = Token Eof "" (lexPos lexer)
+    in lexer { tokens = token : (tokens lexer)}
+
+addToken :: String -> TokenKind -> Lexer -> Lexer 
+addToken lexeme kind lexer =
+    let token = Token kind lexeme (lexPos lexer) 
+    in lexer { tokens = token : (tokens lexer)}
+
+addCharToken :: Char -> Lexer -> Lexer 
+addCharToken char lexer =
+    let token = Token (CharLiteral char) [char] (lexPos lexer) 
+    in lexer { tokens = token : (tokens lexer)}
+
+addStringToken :: String -> Lexer -> Lexer
+addStringToken string lexer =
+    let token = Token (StringLiteral string) string (lexPos lexer) 
+    in lexer { tokens = token : (tokens lexer)}
+
+addIntToken :: String -> Lexer -> Lexer 
+addIntToken lexeme lexer = 
+    let token = Token (IntLiteral (read lexeme :: Int)) lexeme (lexPos lexer) 
+    in lexer { tokens = token : (tokens lexer)}
+   
+addFloatToken :: String -> Lexer -> Lexer 
+addFloatToken lexeme lexer = 
+    let token = Token (FloatLiteral (read lexeme :: Double)) lexeme (lexPos lexer) 
+    in lexer { tokens = token : (tokens lexer)}
+   
+addIdentifierToken :: String -> Lexer -> Lexer
+addIdentifierToken ident lexer =
+    let token = Token (Identifier ident) ident (lexPos lexer) 
+    in lexer { tokens = token : (tokens lexer)}
+
 -- READ FUNCTIONS 
 
 readLineComment :: Lexer -> Lexer 
@@ -103,3 +146,38 @@ readLineComment lexer =
             let (_, lexer') = advance lexer 
             in readLineComment lexer'
         Nothing     -> lexer -- reached the end of the lexer
+
+-- resolveChar :: Char -> Lexer -> Either ()
+
+buildIdentifier :: String -> Lexer -> (String, Lexer) -- need to actually build the identifier, so return a (String, Lexer)
+buildIdentifier lexeme lexer =
+    case peek (source lexer) of 
+        Just char | isIdentiferChar char -> 
+            let (_, lexer') = advance lexer
+            in buildIdentifier (char : lexeme) lexer'
+        _ -> (reverse lexeme, lexer) -- we've built the identifier or keyword (DON'T FORGET TO REVERSE)
+
+readIdentifier :: Lexer -> Lexer 
+readIdentifier lexer =
+    let (lexeme, lexer') = buildIdentifier "" lexer
+    in case lexeme of 
+        -- Literals
+        "true"      -> addToken lexeme Token.True lexer'
+        "false"     -> addToken lexeme Token.False lexer'
+        "and"       -> addToken lexeme And lexer'
+        "or"        -> addToken lexeme Or lexer'
+        "not"       -> addToken lexeme Not lexer'
+        -- Keywords
+        "fun"       -> addToken lexeme Fun lexer'
+        "do"        -> addToken lexeme Do lexer'
+        "end"       -> addToken lexeme End lexer'
+        "var"       -> addToken lexeme Var lexer'
+        "if"        -> addToken lexeme If lexer'
+        "then"      -> addToken lexeme Then lexer'
+        "else"      -> addToken lexeme Else lexer'
+        "while"     -> addToken lexeme While lexer'
+        "return"    -> addToken lexeme Return lexer' 
+        -- Identifier
+        _           -> addIdentifierToken lexeme lexer'
+   
+
