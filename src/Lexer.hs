@@ -10,13 +10,14 @@ data Lexer = Lexer
     { source :: String 
     , start :: Int 
     , curr :: Int
+    , startPos :: Position
     , lexPos :: Position
     , tokens :: [Token]
-    , rep :: [Error]
+    , reporter :: [Error]
     }
 
 init :: String -> Lexer 
-init src = Lexer { source = src, start = 0, curr = 0, lexPos = Position 1 1, tokens = [], rep = [] }
+init src = Lexer { source = src, start = 0, curr = 0, startPos = Position 1 1, lexPos = Position 1 1, tokens = [], reporter = [] }
 
 -- HELPER FUNCTIONS
 
@@ -104,37 +105,48 @@ bump lexer =
 addEofToken :: Lexer -> Lexer 
 addEofToken lexer =
     let token = Token Eof "" (lexPos lexer)
-    in lexer { tokens = token : (tokens lexer)}
+    in lexer { tokens = token : (tokens lexer) }
 
 addToken :: String -> TokenKind -> Lexer -> Lexer 
 addToken lexeme kind lexer =
     let token = Token kind lexeme (lexPos lexer) 
-    in lexer { tokens = token : (tokens lexer)}
+    in lexer { tokens = token : (tokens lexer) }
 
 addCharToken :: Char -> Lexer -> Lexer 
 addCharToken char lexer =
     let token = Token (CharLiteral char) [char] (lexPos lexer) 
-    in lexer { tokens = token : (tokens lexer)}
+    in lexer { tokens = token : (tokens lexer) }
 
 addStringToken :: String -> Lexer -> Lexer
 addStringToken string lexer =
     let token = Token (StringLiteral string) string (lexPos lexer) 
-    in lexer { tokens = token : (tokens lexer)}
+    in lexer { tokens = token : (tokens lexer) }
 
 addIntToken :: String -> Lexer -> Lexer 
 addIntToken lexeme lexer = 
     let token = Token (IntLiteral (read lexeme :: Int)) lexeme (lexPos lexer) 
-    in lexer { tokens = token : (tokens lexer)}
+    in lexer { tokens = token : (tokens lexer) }
    
 addFloatToken :: String -> Lexer -> Lexer 
 addFloatToken lexeme lexer = 
     let token = Token (FloatLiteral (read lexeme :: Double)) lexeme (lexPos lexer) 
-    in lexer { tokens = token : (tokens lexer)}
+    in lexer { tokens = token : (tokens lexer) }
    
 addIdentifierToken :: String -> Lexer -> Lexer
 addIdentifierToken ident lexer =
     let token = Token (Identifier ident) ident (lexPos lexer) 
-    in lexer { tokens = token : (tokens lexer)}
+    in lexer { tokens = token : (tokens lexer) }
+
+-- REPORT ERROR FUNCTIONS
+
+addError :: Position -> String -> [Error] -> [Error]
+addError pos msg rep =
+    let err = Error pos msg
+    in err : rep -- prepends error to the reporter
+
+reportError :: String -> String -> Lexer -> Lexer 
+reportError lexeme msg lexer =
+    addToken lexeme Illegal (lexer { reporter = addError (lexPos lexer) msg (reporter lexer) })
 
 -- READ FUNCTIONS 
 
@@ -159,25 +171,81 @@ buildIdentifier lexeme lexer =
 
 readIdentifier :: Lexer -> Lexer 
 readIdentifier lexer =
-    let (lexeme, lexer') = buildIdentifier "" lexer
+    let (lexeme, lexer) = buildIdentifier "" lexer
     in case lexeme of 
         -- Literals
-        "true"      -> addToken lexeme Token.True lexer'
-        "false"     -> addToken lexeme Token.False lexer'
-        "and"       -> addToken lexeme And lexer'
-        "or"        -> addToken lexeme Or lexer'
-        "not"       -> addToken lexeme Not lexer'
+        "true"      -> addToken lexeme Token.True lexer
+        "false"     -> addToken lexeme Token.False lexer
+        "and"       -> addToken lexeme And lexer
+        "or"        -> addToken lexeme Or lexer
+        "not"       -> addToken lexeme Not lexer
         -- Keywords
-        "fun"       -> addToken lexeme Fun lexer'
-        "do"        -> addToken lexeme Do lexer'
-        "end"       -> addToken lexeme End lexer'
-        "var"       -> addToken lexeme Var lexer'
-        "if"        -> addToken lexeme If lexer'
-        "then"      -> addToken lexeme Then lexer'
-        "else"      -> addToken lexeme Else lexer'
-        "while"     -> addToken lexeme While lexer'
-        "return"    -> addToken lexeme Return lexer' 
+        "fun"       -> addToken lexeme Fun lexer
+        "do"        -> addToken lexeme Do lexer
+        "end"       -> addToken lexeme End lexer
+        "var"       -> addToken lexeme Var lexer
+        "if"        -> addToken lexeme If lexer
+        "then"      -> addToken lexeme Then lexer
+        "else"      -> addToken lexeme Else lexer
+        "while"     -> addToken lexeme While lexer
+        "return"    -> addToken lexeme Return lexer
         -- Identifier
-        _           -> addIdentifierToken lexeme lexer'
+        _           -> addIdentifierToken lexeme lexer
    
+readToken :: Lexer -> Lexer 
+readToken lexer = 
+    let (char, lexer) = advance lexer in 
+        case char of 
+            -- Punctuation
+            '(' -> addToken [char] LeftParen lexer 
+            ')' -> addToken [char] RightParen lexer 
+            ',' -> addToken [char] Comma lexer 
+            ' ' -> lexer -- skip these characters
+            '\r' -> lexer 
+            '\t' -> lexer
+            '\n' -> lexer 
+            -- Line Comment 
+            '#' -> readLineComment lexer 
+            -- Operators
+            '=' -> case peek (source lexer) of 
+                        Just '=' -> addToken "==" EqualEqual (bump lexer)
+                        _ -> addToken "=" Equal lexer
+            '!' -> case peek (source lexer) of 
+                        Just '=' -> addToken "!=" BangEqual (bump lexer)
+                        _ -> addToken "!" Illegal lexer -- '!' is not a valid token
+            '<' -> case peek (source lexer) of 
+                        Just '=' -> addToken "<=" LessEqual (bump lexer)
+                        Just '<' -> addToken "<<" LessLess (bump lexer)
+                        _ -> addToken "<" Less lexer
+            '>' -> case peek (source lexer) of 
+                        Just '=' -> addToken ">=" GreaterEqual (bump lexer)
+                        Just '>' -> addToken ">>" GreaterGreater (bump lexer)
+                        _ -> addToken ">" Greater lexer
+            '+' -> addToken "+" Plus lexer 
+            '-' -> addToken "-" Minus lexer 
+            '*' -> addToken "*" Star lexer        
+            '/' -> addToken "/" Slash lexer 
+            '%' -> addToken "%" Percent lexer 
+            '&' -> addToken "&" Amp lexer 
+            '|' -> addToken "|" Pipe lexer 
+            '^' -> addToken "^" Caret lexer 
+            '~' -> addToken "~" Tilde lexer 
+            -- Literals
+            -- to be implemented
+            char | isIdentiferStart char -> readIdentifier lexer
+            -- Character not supported
+            _ -> reportError [char] ("unexpected character " ++ [char]) lexer
 
+readTokens :: Lexer -> Lexer 
+readTokens lexer = 
+    case peek (source lexer) of 
+        Just _ ->
+            let lexer = lexer -- need to figure this part out
+                    { start = curr lexer
+                    , startPos = (lexPos lexer)
+                    }
+            in readTokens (readToken lexer)
+        Nothing -> 
+            lexer {
+                tokens = reverse (tokens (addEofToken lexer))
+            }
